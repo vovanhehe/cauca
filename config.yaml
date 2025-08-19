@@ -1,0 +1,183 @@
+roi:
+  x: 0
+  y: 85
+  w: 1919
+  h: 655
+
+capture:
+  output_idx: 0
+  prefer_async: true
+  target_fps: 120
+  max_buffer_len: 4
+
+inference:
+  conf_thres: 0.50          # Giảm từ 0.60 → 0.50
+  iou_thres: 0.4            # Giảm từ 0.5 → 0.4
+  imgsz: 640
+  fp16: true
+  max_det: 6               # Tăng từ 20 → 25
+
+tracker:
+  state_ttl: 1.5
+
+filter:
+  min_area_ratio: 0.0005
+  max_area_ratio: 0.12
+  min_ar: 0.6
+  max_ar: 1.6
+
+classification:
+  tta: ["glyph","adaptive","none"]
+  crop_margin: 0.30
+
+fusion:
+  alpha_cls: 0.75
+
+template:
+  size: 64
+  max_per_label: 6
+  seed_min_det: 0.90
+
+bank:
+  ttl_sec: 8.0
+  max_total_entries: 200
+  scene_change_thr: 0.12
+  conflict_window_sec: 3.0
+  conflict_max: 3
+
+decision:
+  det_gate: 0.70          # Giảm từ 0.86 → 0.70
+  det_gate_tm: 0.70       # Giảm từ 0.86 → 0.70
+  min_hits: 1             # Giữ nguyên
+  min_run: 1              # Giảm từ 2 → 1
+  fused_thr: 0.25         # Giảm từ 0.40 → 0.25
+  margin_thr: 0.15        # Giảm từ 0.25 → 0.15
+  pmargin_thr: 0.15       # Giảm từ 0.25 → 0.15
+  template_veto: 0.75     # Giảm từ 0.80 → 0.75
+  template_force: 0.85    # Giảm từ 0.92 → 0.85
+
+# Human-in-the-loop settings
+human_in_the_loop:
+  enable: false             # Tắt learning tạm thời
+  confidence_threshold: 0.5  # Giảm từ 0.65 → 0.5
+  margin_threshold: 0.10     # Giảm từ 0.15 → 0.10
+
+ui_color_gate:
+  enable: true
+  h_low: 80
+  h_high: 110
+  s_low: 50
+  v_low: 30
+  min_ratio: 0.10
+  dilate_px: 2
+
+letter_gate:
+  white_s_max: 60
+  white_v_min: 185
+  erode_px: 1
+  min_ratio: 0.004
+
+glyph_override:
+  enable: true
+  w_min_ar: 1.30
+  u_max_ar: 1.12
+
+bubble_gate:
+  enable: true
+  min_circularity: 0.55
+  max_aspect_ratio: 1.9
+  min_teal_ratio: 0.10
+
+overlay:
+  green_mode: det
+
+exclude_zones:
+  - { x: 1510, y: 320, w: 410, h: 80 }
+exclude_iou_thr: 0.15
+
+allowed_keys:
+  - "1"
+  - "2"
+  - "3"
+  - "4"
+  - "5"
+  - "6"
+  - "7"
+  - "8"
+  - "9"
+  - "a"
+  - "b"
+  - "c"
+  - "d"
+  - "e"
+  - "f"
+  - "g"
+  - "h"
+  - "j"
+  - "k"
+  - "l"
+  - "m"
+  - "n"
+  - "p"
+  - "q"
+  - "r"
+  - "s"
+  - "t"
+  - "u"
+  - "v"
+  - "w"
+  - "y"
+  - "z"
+
+keys:
+  - "1"
+  - "2"
+  - "3"
+  - "4"
+  - "5"
+  - "6"
+  - "7"
+  - "8"
+  - "9"
+  - "a"
+  - "b"
+  - "c"
+  - "d"
+  - "e"
+  - "f"
+  - "g"
+  - "h"
+  - "j"
+  - "k"
+  - "l"
+  - "m"
+  - "n"
+  - "p"
+  - "q"
+  - "r"
+  - "s"
+  - "t"
+  - "u"
+  - "v"
+  - "w"
+  - "y"
+  - "z"
+
+press:
+  per_key_delay_ms: 20
+  cool_down_ms: 500
+  global_rate_limit_ms: 50
+  max_presses_per_frame: 1
+  region_ttl_ms: 350
+  region_iou_thr: 0.35
+  region_center_dist_px: 40
+
+safety:
+  pydirectinput_failsafe: false
+
+debug:
+  show_window: true
+  print_logs: true
+  overlay_fps: 30
+  draw_exclude_zones: true
+  save_crops_dir: ""
