@@ -14,6 +14,7 @@ from tkinter import messagebox, simpledialog
 from classifier import Predictor
 from template_matcher import TemplateBank
 from wgc_direct import WGCCapture
+from sort import Sort
 
 # ============ Utils ============
 def resource_path(rel: str) -> str:
@@ -1785,7 +1786,16 @@ class AutoQTE:
             "confidence_trends": defaultdict(list)
         }
 
+        # ← SORT TRACKER INITIALIZATION
+        # Initialize SORT tracker for stable object IDs
+        self.sort_tracker = Sort(
+            max_age=3,      # Keep tracks for 3 frames without detections
+            min_hits=1,     # Minimum hits before track is confirmed
+            iou_threshold=0.3  # IoU threshold for matching detections to tracks
+        )
+        
         print("[TRACKING] 📊 Performance monitoring initialized")
+        print("[TRACKING] 🎯 SORT tracker initialized for stable object IDs")
     
     def get_char_difficulty(self, char):
         """Get difficulty level for character"""
@@ -2836,7 +2846,10 @@ class AutoQTE:
                     print(f"[BOX-DEBUG] ⚠️ {rejected_boxes} boxes REJECTED by size/aspect ratio filters")
 
             now = time.time()
-            items = []
+            
+            # ← COLLECT VALID DETECTIONS FOR SORT TRACKING
+            valid_detections = []
+            detection_data = []  # Store original data for each valid detection
             gate_rejections = {"exclude": 0, "color": 0, "shape": 0}
             
             for idx, ((x1,y1,x2,y2), conf) in enumerate(zip(boxes, confs)):
@@ -2844,7 +2857,7 @@ class AutoQTE:
                     continue
                 box = (x1,y1,x2,y2)
                 
-                # ← DEBUG GATE REJECTIONS
+                # ← APPLY GATES - SAME AS BEFORE
                 if self._box_in_exclude(box):
                     gate_rejections["exclude"] += 1
                     if self.print_logs:
@@ -2861,21 +2874,67 @@ class AutoQTE:
                         print(f"[GATE-DEBUG] Box {idx} REJECTED: failed shape gate")
                     continue
 
-                obj_id = idx
-                st = getattr(self, "state", {}).get(obj_id)
-                if st is None:
-                    st = {"first": now, "last": now, "hits": 0, "run": 0, "last_label": None,
-                        "ema_prob": None, "pressed": 0, "pressed_at": 0.0,
-                        "last_prob": 0.0, "last_margin": 0.0, "last_pmargin": 0.0,
-                        "tm": 0.0, "fused": 0.0, "label": None, "det_ema": float(conf)}
-                    if not hasattr(self, "state"):
-                        self.state = {}
-                    self.state[obj_id] = st
-                else:
-                    st["last"] = now
-                    st["det_ema"] = 0.6*float(conf) + 0.4*st.get("det_ema", float(conf))
-                st["hits"] += 1
-                items.append((obj_id, box, st))
+                # ← DETECTION PASSED ALL GATES - ADD TO SORT INPUT
+                valid_detections.append([x1, y1, x2, y2, conf])
+                detection_data.append({"idx": idx, "box": box, "conf": conf})
+
+            # ← USE SORT FOR STABLE OBJECT TRACKING
+            items = []
+            if valid_detections:
+                # Convert to numpy array for SORT
+                dets_np = np.array(valid_detections, dtype=np.float32)
+                
+                # Get tracked objects with stable IDs from SORT
+                tracked_objects = self.sort_tracker.update(dets_np)
+                
+                if self.print_logs and len(tracked_objects) > 0:
+                    print(f"[SORT-DEBUG] SORT returned {len(tracked_objects)} tracked objects")
+                
+                # Match SORT results back to our detection data
+                for track in tracked_objects:
+                    track_x1, track_y1, track_x2, track_y2, sort_obj_id = track
+                    sort_obj_id = int(sort_obj_id)
+                    
+                    # Find which detection this track corresponds to
+                    best_match_idx = -1
+                    best_iou = 0.0
+                    track_box = (int(track_x1), int(track_y1), int(track_x2), int(track_y2))
+                    
+                    for det_idx, det_data in enumerate(detection_data):
+                        det_box = det_data["box"]
+                        overlap = iou(track_box, det_box)
+                        if overlap > best_iou:
+                            best_iou = overlap
+                            best_match_idx = det_idx
+                    
+                    if best_match_idx >= 0 and best_iou > 0.1:  # Minimum IoU threshold for matching
+                        det_data = detection_data[best_match_idx]
+                        box = det_data["box"] 
+                        conf = det_data["conf"]
+                        
+                        # ← USE SORT-PROVIDED STABLE OBJECT ID
+                        obj_id = sort_obj_id
+                        
+                        # ← MANAGE OBJECT STATE WITH STABLE ID
+                        st = getattr(self, "state", {}).get(obj_id)
+                        if st is None:
+                            st = {"first": now, "last": now, "hits": 0, "run": 0, "last_label": None,
+                                "ema_prob": None, "pressed": 0, "pressed_at": 0.0,
+                                "last_prob": 0.0, "last_margin": 0.0, "last_pmargin": 0.0,
+                                "tm": 0.0, "fused": 0.0, "label": None, "det_ema": float(conf)}
+                            if not hasattr(self, "state"):
+                                self.state = {}
+                            self.state[obj_id] = st
+                            if self.print_logs:
+                                print(f"[SORT-DEBUG] 🆕 New stable object ID{obj_id} created")
+                        else:
+                            st["last"] = now
+                            st["det_ema"] = 0.6*float(conf) + 0.4*st.get("det_ema", float(conf))
+                        st["hits"] += 1
+                        items.append((obj_id, box, st))
+            else:
+                # No valid detections - still call SORT with empty array to maintain tracking
+                self.sort_tracker.update(np.empty((0, 5)))
 
             # ← PRINT GATE REJECTION SUMMARY
             if self.print_logs and any(gate_rejections.values()):
