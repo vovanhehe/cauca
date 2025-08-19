@@ -1788,10 +1788,11 @@ class AutoQTE:
 
         # ← SORT TRACKER INITIALIZATION
         # Initialize SORT tracker for stable object IDs
+        # Tuned for bubble game: longer tracking, lower IoU threshold for fast motion
         self.sort_tracker = Sort(
-            max_age=3,      # Keep tracks for 3 frames without detections
-            min_hits=1,     # Minimum hits before track is confirmed
-            iou_threshold=0.3  # IoU threshold for matching detections to tracks
+            max_age=5,      # Keep tracks for 5 frames without detections (handle fast motion)
+            min_hits=1,     # Minimum hits before track is confirmed (immediate tracking)
+            iou_threshold=0.2  # Lower IoU threshold for fast-moving bubbles
         )
         
         print("[TRACKING] 📊 Performance monitoring initialized")
@@ -2907,7 +2908,7 @@ class AutoQTE:
                             best_iou = overlap
                             best_match_idx = det_idx
                     
-                    if best_match_idx >= 0 and best_iou > 0.1:  # Minimum IoU threshold for matching
+                    if best_match_idx >= 0 and best_iou > 0.05:  # Lower minimum IoU for fast bubbles
                         det_data = detection_data[best_match_idx]
                         box = det_data["box"] 
                         conf = det_data["conf"]
